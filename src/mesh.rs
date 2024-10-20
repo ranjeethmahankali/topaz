@@ -38,6 +38,22 @@ impl Mesh {
         }
     }
 
+    pub fn num_vertices(&self) -> usize {
+        self.topol.num_vertices()
+    }
+
+    pub fn num_edges(&self) -> usize {
+        self.topol.num_edges()
+    }
+
+    pub fn num_halfedges(&self) -> usize {
+        self.topol.num_halfedges()
+    }
+
+    pub fn num_faces(&self) -> usize {
+        self.topol.num_faces()
+    }
+
     pub fn point(&self, vi: u32) -> Result<glam::Vec3, Error> {
         self.points.get(vi)
     }

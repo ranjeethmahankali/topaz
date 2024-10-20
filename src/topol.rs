@@ -140,6 +140,22 @@ impl Topology {
         self.opposite_halfedge(self.halfedge(h).prev)
     }
 
+    pub fn num_vertices(&self) -> usize {
+        self.vertices.len()
+    }
+
+    pub fn num_edges(&self) -> usize {
+        self.edges.len()
+    }
+
+    pub fn num_halfedges(&self) -> usize {
+        self.num_edges() * 2
+    }
+
+    pub fn num_faces(&self) -> usize {
+        self.faces.len()
+    }
+
     pub fn find_halfedge(&self, from: u32, to: u32) -> Option<u32> {
         OutgoingHalfedgeIter::from(self, from).find(|h| self.to_vertex(*h) == to)
     }
