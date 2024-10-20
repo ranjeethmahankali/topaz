@@ -21,10 +21,11 @@ enum TentativeEdge {
 
 #[derive(Default)]
 pub(crate) struct TopolCache {
-    halfedges: Vec<Option<u32>>,
+    loop_halfedges: Vec<Option<u32>>,
     needs_adjust: Vec<bool>,
     next_cache: Vec<(u32, u32)>,
     tentative: Vec<TentativeEdge>,
+    halfedges: Vec<u32>,
 }
 
 pub(crate) struct Vertex {
@@ -238,7 +239,7 @@ impl Topology {
     }
 
     pub fn add_face(&mut self, verts: &[u32], cache: &mut TopolCache) -> Result<u32, Error> {
-        cache.halfedges.reserve(verts.len());
+        cache.loop_halfedges.reserve(verts.len());
         cache.needs_adjust.reserve(verts.len());
         cache.next_cache.reserve(verts.len() * 6);
         // Check for topological errors.
@@ -253,12 +254,15 @@ impl Topology {
                 Some(h) if !self.is_boundary_halfedge(h) => return Err(Error::ComplexEdge(h)),
                 _ => {} // Do nothing.
             }
-            cache.halfedges.push(h);
+            cache.loop_halfedges.push(h);
             cache.needs_adjust.push(false);
         }
         // If any vertex has more than two incident boundary edges, relinking might be necessary.
         for (prev, next) in (0..verts.len()).filter_map(|i| {
-            match (cache.halfedges[i], cache.halfedges[(i + 1) % verts.len()]) {
+            match (
+                cache.loop_halfedges[i],
+                cache.loop_halfedges[(i + 1) % verts.len()],
+            ) {
                 (Some(prev), Some(next)) if self.next_halfedge(prev) != next => Some((prev, next)),
                 _ => None,
             }
@@ -300,7 +304,7 @@ impl Topology {
             let mut ei = self.edges.len() as u32;
             cache
                 .tentative
-                .extend((0..verts.len()).map(|i| match cache.halfedges[i] {
+                .extend((0..verts.len()).map(|i| match cache.loop_halfedges[i] {
                     Some(h) => TentativeEdge::Old(h),
                     None => TentativeEdge::New {
                         index: {
@@ -406,6 +410,8 @@ impl Topology {
             };
         }
         // Convert tentative edges into real edges.
+        cache.halfedges.clear();
+        cache.halfedges.reserve(cache.tentative.len());
         const ERR: &str = "Unable to create edge loop";
         for tedge in &cache.tentative {
             match tedge {
@@ -428,6 +434,7 @@ impl Topology {
                         opp_next.expect(ERR),
                     );
                     assert_eq!(*index >> 1, ei, "Failed to create an edge loop");
+                    cache.halfedges.push(*index);
                 }
             }
         }
@@ -436,6 +443,9 @@ impl Topology {
             TentativeEdge::Old(index) => *index,
             TentativeEdge::New { index, .. } => *index,
         })?;
+        for h in &cache.halfedges {
+            self.halfedge_mut(*h).face = Some(fnew);
+        }
         // Process next halfedge cache.
         for (prev, next) in cache.next_cache.drain(..) {
             self.set_next_halfedge(prev, next);
@@ -472,5 +482,12 @@ mod test {
         assert_eq!(topol.num_halfedges(), 6);
         assert_eq!(topol.num_vertices(), 3);
         assert_eq!(face, 0);
+        for v in topol.vertex_iter() {
+            let h = topol
+                .vertex_halfedge(v)
+                .expect("Vertex must have an incident halfedge");
+            assert!(topol.is_boundary_halfedge(h));
+            assert!(!topol.is_boundary_halfedge(topol.opposite_halfedge(h)));
+        }
     }
 }
