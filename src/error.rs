@@ -1,7 +1,6 @@
 pub enum Error {
     // Properties.
-    ReadPropertyFailed,
-    WriteToPropertyFailed,
+    BorrowedPropertyAccess,
     PropertyDoesNotExist,
     // Topology.
     ComplexVertex(u32),

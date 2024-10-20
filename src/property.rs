@@ -1,4 +1,7 @@
-use std::sync::{Arc, RwLock, Weak};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 use crate::error::Error;
 
@@ -98,13 +101,13 @@ trait GenericProperty {
 }
 
 pub struct Property<T: TPropData> {
-    data: Arc<RwLock<Vec<T>>>,
+    data: Rc<RefCell<Vec<T>>>,
 }
 
 impl<T: TPropData> Property<T> {
     pub fn new(container: &mut PropertyContainer) -> Self {
         let prop = Property {
-            data: Arc::new(RwLock::new(Vec::new())),
+            data: Rc::new(RefCell::new(Vec::new())),
         };
         container.push_property(prop.generic_ref());
         prop
@@ -112,7 +115,7 @@ impl<T: TPropData> Property<T> {
 
     pub fn with_capacity(n: usize, container: &mut PropertyContainer) -> Self {
         let prop = Property {
-            data: Arc::new(RwLock::new(Vec::with_capacity(n))),
+            data: Rc::new(RefCell::new(Vec::with_capacity(n))),
         };
         container.push_property(prop.generic_ref());
         prop
@@ -120,24 +123,24 @@ impl<T: TPropData> Property<T> {
 
     fn generic_ref(&self) -> Box<dyn GenericProperty> {
         Box::new(PropertyRef {
-            data: Arc::downgrade(&self.data),
+            data: Rc::downgrade(&self.data),
         })
     }
 
     pub fn get(&self, i: u32) -> Result<T, Error> {
         self.data
-            .read()
-            .map_err(|_| Error::ReadPropertyFailed)?
+            .try_borrow()
+            .map_err(|_| Error::BorrowedPropertyAccess)?
             .get(i as usize)
-            .ok_or(Error::ReadPropertyFailed)
+            .ok_or(Error::BorrowedPropertyAccess)
             .copied()
     }
 
     pub fn set(&mut self, i: u32, val: T) -> Result<(), Error> {
         let mut buf = self
             .data
-            .write()
-            .map_err(|_| Error::WriteToPropertyFailed)?;
+            .try_borrow_mut()
+            .map_err(|_| Error::BorrowedPropertyAccess)?;
         buf[i as usize] = val;
         Ok(())
     }
@@ -152,11 +155,11 @@ impl<T: TPropData> Default for Property<T> {
 }
 
 struct PropertyRef<T: TPropData> {
-    data: Weak<RwLock<Vec<T>>>,
+    data: Weak<RefCell<Vec<T>>>,
 }
 
 impl<T: TPropData> PropertyRef<T> {
-    fn upgrade(&self) -> Result<Arc<RwLock<Vec<T>>>, Error> {
+    fn upgrade(&self) -> Result<Rc<RefCell<Vec<T>>>, Error> {
         self.data.upgrade().ok_or(Error::PropertyDoesNotExist)
     }
 }
@@ -164,48 +167,48 @@ impl<T: TPropData> PropertyRef<T> {
 impl<T: TPropData> GenericProperty for PropertyRef<T> {
     fn reserve(&mut self, n: usize) -> Result<(), Error> {
         self.upgrade()?
-            .write()
-            .map_err(|_| Error::WriteToPropertyFailed)?
+            .try_borrow_mut()
+            .map_err(|_| Error::BorrowedPropertyAccess)?
             .reserve(n); // reserve memory.
         Ok(())
     }
 
     fn resize(&mut self, n: usize) -> Result<(), Error> {
         self.upgrade()?
-            .write()
-            .map_err(|_| Error::WriteToPropertyFailed)?
+            .try_borrow_mut()
+            .map_err(|_| Error::BorrowedPropertyAccess)?
             .resize(n, T::default());
         Ok(())
     }
 
     fn clear(&mut self) -> Result<(), Error> {
         self.upgrade()?
-            .write()
-            .map_err(|_| Error::WriteToPropertyFailed)?
+            .try_borrow_mut()
+            .map_err(|_| Error::BorrowedPropertyAccess)?
             .clear();
         Ok(())
     }
 
     fn push(&mut self) -> Result<(), Error> {
         self.upgrade()?
-            .write()
-            .map_err(|_| Error::WriteToPropertyFailed)?
+            .try_borrow_mut()
+            .map_err(|_| Error::BorrowedPropertyAccess)?
             .push(T::default());
         Ok(())
     }
 
     fn swap(&mut self, i: usize, j: usize) -> Result<(), Error> {
         self.upgrade()?
-            .write()
-            .map_err(|_| Error::WriteToPropertyFailed)?
+            .try_borrow_mut()
+            .map_err(|_| Error::BorrowedPropertyAccess)?
             .swap(i, j);
         Ok(())
     }
 
     fn copy(&mut self, src: usize, dst: usize) -> Result<(), Error> {
         self.upgrade()?
-            .write()
-            .map_err(|_| Error::WriteToPropertyFailed)?
+            .try_borrow_mut()
+            .map_err(|_| Error::BorrowedPropertyAccess)?
             .copy_within(src..(src + 1), dst);
         Ok(())
     }
@@ -213,8 +216,8 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
     fn len(&self) -> Result<usize, Error> {
         Ok(self
             .upgrade()?
-            .read()
-            .map_err(|_| Error::ReadPropertyFailed)?
+            .try_borrow()
+            .map_err(|_| Error::BorrowedPropertyAccess)?
             .len())
     }
 }
