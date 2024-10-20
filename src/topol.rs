@@ -487,7 +487,28 @@ mod test {
                 .vertex_halfedge(v)
                 .expect("Vertex must have an incident halfedge");
             assert!(topol.is_boundary_halfedge(h));
-            assert!(!topol.is_boundary_halfedge(topol.opposite_halfedge(h)));
+            let oh = topol.opposite_halfedge(h);
+            assert!(!topol.is_boundary_halfedge(oh));
+            assert_eq!(
+                topol
+                    .halfedge_face(oh)
+                    .expect("Halfedge must have an incident face"),
+                face
+            );
         }
+        assert_eq!(
+            topol
+                .halfedge_iter()
+                .filter(|h| topol.is_boundary_halfedge(*h))
+                .count(),
+            3
+        );
+        assert_eq!(
+            topol
+                .halfedge_iter()
+                .filter(|h| !topol.is_boundary_halfedge(*h))
+                .count(),
+            3
+        );
     }
 }
