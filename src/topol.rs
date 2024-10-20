@@ -162,6 +162,7 @@ impl Topology {
 
     pub fn add_vertex(&mut self) -> Result<u32, Error> {
         let vi = self.vertices.len() as u32;
+        self.vertices.push(Vertex { halfedge: None });
         self.vprops.push_value()?;
         Ok(vi)
     }
@@ -224,7 +225,7 @@ impl Topology {
         cache.next_cache.reserve(verts.len() * 6);
         // Check for topological errors.
         for i in 0..verts.len() {
-            if self.is_boundary_vertex(verts[i]) {
+            if !self.is_boundary_vertex(verts[i]) {
                 // Ensure vertex is manifold.
                 return Err(Error::ComplexVertex(verts[i]));
             }
@@ -408,7 +409,7 @@ impl Topology {
                         opp_prev.expect(ERR),
                         opp_next.expect(ERR),
                     );
-                    assert!(*index == ei, "Failed to create an edge loop");
+                    assert_eq!(*index >> 1, ei, "Failed to create an edge loop");
                 }
             }
         }
@@ -434,5 +435,24 @@ impl Topology {
 impl Default for Topology {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{TopolCache, Topology};
+
+    #[test]
+    fn t_triangle() {
+        let mut topol = Topology::default();
+        let mut cache = TopolCache::default();
+        let verts: Vec<_> = (0..3).map(|_| topol.add_vertex()).flatten().collect();
+        assert_eq!(verts, vec![0, 1, 2]);
+        let face = topol.add_face(&verts, &mut cache).unwrap();
+        assert_eq!(topol.num_faces(), 1);
+        assert_eq!(topol.num_edges(), 3);
+        assert_eq!(topol.num_halfedges(), 6);
+        assert_eq!(topol.num_vertices(), 3);
+        assert_eq!(face, 0);
     }
 }
