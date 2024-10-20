@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::{
     error::Error,
     iterator::OutgoingHalfedgeIter,
@@ -150,6 +152,22 @@ impl Topology {
 
     pub fn num_halfedges(&self) -> usize {
         self.num_edges() * 2
+    }
+
+    pub fn vertex_iter(&self) -> Range<u32> {
+        0..(self.num_vertices() as u32)
+    }
+
+    pub fn halfedge_iter(&self) -> Range<u32> {
+        0..(self.num_halfedges() as u32)
+    }
+
+    pub fn edge_iter(&self) -> Range<u32> {
+        0..(self.num_edges() as u32)
+    }
+
+    pub fn face_iter(&self) -> Range<u32> {
+        0..(self.num_faces() as u32)
     }
 
     pub fn num_faces(&self) -> usize {

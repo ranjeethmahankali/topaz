@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use crate::{
     error::Error,
     iterator::OutgoingCWHalfedgeIter,
@@ -52,6 +54,22 @@ impl Mesh {
 
     pub fn num_faces(&self) -> usize {
         self.topol.num_faces()
+    }
+
+    pub fn vertex_iter(&self) -> Range<u32> {
+        self.topol.vertex_iter()
+    }
+
+    pub fn halfedge_iter(&self) -> Range<u32> {
+        self.topol.halfedge_iter()
+    }
+
+    pub fn edge_iter(&self) -> Range<u32> {
+        self.topol.edge_iter()
+    }
+
+    pub fn face_iter(&self) -> Range<u32> {
+        self.topol.face_iter()
     }
 
     pub fn point(&self, vi: u32) -> Result<glam::Vec3, Error> {
