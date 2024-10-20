@@ -256,14 +256,6 @@ impl Topology {
         }
         Ok(fnew)
     }
-
-    pub fn add_tri_face(&mut self, v0: u32, v1: u32, v2: u32) -> Result<u32, Error> {
-        self.add_face(&[v0, v1, v2])
-    }
-
-    pub fn add_quad_face(&mut self, v0: u32, v1: u32, v2: u32, v3: u32) -> Result<u32, Error> {
-        self.add_face(&[v0, v1, v2, v3])
-    }
 }
 
 impl Default for Topology {

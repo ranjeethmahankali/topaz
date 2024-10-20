@@ -7,7 +7,7 @@ pub struct OutgoingCCWHalfedgeIter<'a> {
 }
 
 impl<'a> OutgoingCCWHalfedgeIter<'a> {
-    pub fn from(topol: &'a Topology, v: u32) -> Self {
+    pub(crate) fn from(topol: &'a Topology, v: u32) -> Self {
         let h = topol.vertex_halfedge(v);
         OutgoingCCWHalfedgeIter {
             topol,
@@ -46,7 +46,7 @@ pub struct OutgoingCWHalfedgeIter<'a> {
 }
 
 impl<'a> OutgoingCWHalfedgeIter<'a> {
-    pub fn from(topol: &'a Topology, v: u32) -> Self {
+    pub(crate) fn from(topol: &'a Topology, v: u32) -> Self {
         let h = topol.vertex_halfedge(v);
         OutgoingCWHalfedgeIter {
             topol,
