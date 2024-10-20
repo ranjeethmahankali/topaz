@@ -4,5 +4,7 @@ pub enum Error {
     WriteToPropertyFailed,
     PropertyDoesNotExist,
     // Topology.
-    ComplexVertex,
+    ComplexVertex(u32),
+    ComplexEdge(u32),
+    HalfedgeNotFound,
 }

@@ -4,6 +4,16 @@ use crate::{
     property::{Property, PropertyContainer, TPropData},
 };
 
+struct EdgeCache {
+    halfedge: Option<u32>,
+    needs_adjust: bool,
+}
+
+#[derive(Default)]
+struct Cache {
+    edge_data: Vec<EdgeCache>,
+}
+
 pub struct Vertex {
     halfedge: Option<u32>,
 }
@@ -28,6 +38,8 @@ pub struct Topology {
     edges: Vec<Edge>,
     faces: Vec<Face>,
     vprops: PropertyContainer,
+    fprops: PropertyContainer,
+    cache: Cache,
 }
 
 impl Topology {
@@ -37,6 +49,8 @@ impl Topology {
             edges: Vec::new(),
             faces: Vec::new(),
             vprops: PropertyContainer::new(),
+            fprops: PropertyContainer::new(),
+            cache: Cache::default(),
         }
     }
 
@@ -46,6 +60,8 @@ impl Topology {
             edges: Vec::with_capacity(nedges),
             faces: Vec::with_capacity(nfaces),
             vprops: PropertyContainer::new(),
+            fprops: PropertyContainer::new(),
+            cache: Cache::default(),
         }
     }
 
@@ -67,6 +83,10 @@ impl Topology {
 
     fn face(&self, f: u32) -> &Face {
         &self.faces[f as usize]
+    }
+
+    fn face_mut(&mut self, f: u32) -> &mut Face {
+        &mut self.faces[f as usize]
     }
 
     pub fn to_vertex(&self, h: u32) -> u32 {
@@ -130,14 +150,89 @@ impl Topology {
         Ok(vi)
     }
 
+    fn new_face(&mut self) -> Result<u32, Error> {
+        let fi = self.faces.len() as u32;
+        self.fprops.push_value()?;
+        Ok(fi)
+    }
+
+    fn adjust_outgoing_halfedge(&mut self, _v: u32) {
+        todo!("Not Implemented");
+    }
+
+    pub fn set_face_halfedge(&mut self, f: u32, h: u32) {
+        self.face_mut(f).halfedge = h;
+    }
+
     pub fn add_face(&mut self, verts: &[u32]) -> Result<u32, Error> {
+        // Check for topological errors.
         for i in 0..verts.len() {
             if self.is_boundary_vertex(verts[i]) {
-                return Err(Error::ComplexVertex);
+                // Ensure vertex is manifold.
+                return Err(Error::ComplexVertex(verts[i]));
             }
-            // let j = (i + 1) % verts.len();
+            let j = (i + 1) % verts.len();
+            // Ensure edge is manifold.
+            let h = self.find_halfedge(verts[i], verts[j]);
+            match h {
+                Some(h) if !self.is_boundary_halfedge(h) => return Err(Error::ComplexEdge(h)),
+                _ => {} // Do nothing.
+            }
+            self.cache.edge_data.push(EdgeCache {
+                halfedge: h,
+                needs_adjust: false,
+            });
         }
-        todo!("Not Implemented");
+        // Find consecutive halfedge pairs that need relinking, and relink the patches.
+        for (_prev, _next) in (0..verts.len()).filter_map(|i| {
+            let j = (i + 1) % verts.len();
+            match (
+                self.cache.edge_data[i].halfedge,
+                self.cache.edge_data[j].halfedge,
+            ) {
+                (Some(prev), Some(next)) if self.next_halfedge(prev) != next => Some((prev, next)),
+                _ => None,
+            }
+        }) {
+            // Relink the whole patch.
+            todo!("Not Implemented");
+        }
+        // Create missing edges.
+        for (_i, _j) in (0..verts.len()).filter_map(|i| {
+            if self.cache.edge_data[i].halfedge.is_none() {
+                Some((i, (i + 1) % verts.len()))
+            } else {
+                None
+            }
+        }) {
+            todo!("Not Implemented");
+        }
+        // Create the face.
+        let fnew = self.new_face()?;
+        self.set_face_halfedge(
+            fnew,
+            self.cache
+                .edge_data
+                .last()
+                .ok_or(Error::HalfedgeNotFound)?
+                .halfedge
+                .ok_or(Error::HalfedgeNotFound)?,
+        );
+        // Setup halfedges.
+        for _i in 0..verts.len() {
+            todo!("Not Implemented");
+        }
+        // Process next halfedge cache.
+        for _i in 0..verts.len() {
+            todo!("Not Implemented");
+        }
+        // Adjust vertices' halfedge handles.
+        for i in 0..verts.len() {
+            if self.cache.edge_data[i].needs_adjust {
+                self.adjust_outgoing_halfedge(verts[i]);
+            }
+        }
+        Ok(fnew)
     }
 
     pub fn add_tri_face(&mut self, v0: u32, v1: u32, v2: u32) -> Result<u32, Error> {
