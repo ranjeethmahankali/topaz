@@ -4,14 +4,11 @@ use crate::{
     property::{Property, PropertyContainer, TPropData},
 };
 
-struct EdgeCache {
-    halfedge: Option<u32>,
-    needs_adjust: bool,
-}
-
 #[derive(Default)]
 struct Cache {
-    edge_data: Vec<EdgeCache>,
+    halfedges: Vec<Option<u32>>,
+    needs_adjust: Vec<bool>,
+    next_cache: Vec<(u32, u32)>,
 }
 
 pub struct Vertex {
@@ -168,6 +165,9 @@ impl Topology {
     }
 
     pub fn add_face(&mut self, verts: &[u32]) -> Result<u32, Error> {
+        self.cache.halfedges.reserve(verts.len());
+        self.cache.needs_adjust.reserve(verts.len());
+        self.cache.next_cache.reserve(verts.len() * 6);
         // Check for topological errors.
         for i in 0..verts.len() {
             if self.is_boundary_vertex(verts[i]) {
@@ -181,33 +181,53 @@ impl Topology {
                 Some(h) if !self.is_boundary_halfedge(h) => return Err(Error::ComplexEdge(h)),
                 _ => {} // Do nothing.
             }
-            self.cache.edge_data.push(EdgeCache {
-                halfedge: h,
-                needs_adjust: false,
-            });
+            self.cache.halfedges.push(h);
+            self.cache.needs_adjust.push(false);
         }
         // Find consecutive halfedge pairs that need relinking, and relink the patches.
-        for (_prev, _next) in (0..verts.len()).filter_map(|i| {
-            let j = (i + 1) % verts.len();
-            match (
-                self.cache.edge_data[i].halfedge,
-                self.cache.edge_data[j].halfedge,
-            ) {
-                (Some(prev), Some(next)) if self.next_halfedge(prev) != next => Some((prev, next)),
-                _ => None,
-            }
-        }) {
+        for i in 0..verts.len() {
+            let (prev, next) = {
+                let j = (i + 1) % verts.len();
+                match (self.cache.halfedges[i], self.cache.halfedges[j]) {
+                    (Some(prev), Some(next)) if self.next_halfedge(prev) != next => (prev, next),
+                    _ => continue,
+                }
+            };
             // Relink the whole patch.
-            todo!("Not Implemented");
+            let outprev = self.opposite_halfedge(next);
+            let boundprev = {
+                let mut out = outprev;
+                loop {
+                    out = self.opposite_halfedge(self.next_halfedge(out));
+                    if !self.is_boundary_halfedge(out) {
+                        break;
+                    }
+                }
+                out
+            };
+            let boundnext = self.next_halfedge(boundprev);
+            // Ok ?
+            if boundprev == prev {
+                return Err(Error::PatchRelinkingFailed);
+            }
+            debug_assert!(
+                self.is_boundary_halfedge(boundprev) && self.is_boundary_halfedge(boundnext)
+            );
+            // other halfedges.
+            let pstart = self.next_halfedge(prev);
+            let pend = self.prev_halfedge(next);
+            // relink.
+            self.cache.next_cache.extend_from_slice(&[
+                (boundprev, pstart),
+                (pend, boundnext),
+                (prev, next),
+            ]);
         }
         // Create missing edges.
-        for (_i, _j) in (0..verts.len()).filter_map(|i| {
-            if self.cache.edge_data[i].halfedge.is_none() {
-                Some((i, (i + 1) % verts.len()))
-            } else {
-                None
+        for i in 0..verts.len() {
+            if self.cache.halfedges[i].is_some() {
+                continue;
             }
-        }) {
             todo!("Not Implemented");
         }
         // Create the face.
@@ -215,10 +235,9 @@ impl Topology {
         self.set_face_halfedge(
             fnew,
             self.cache
-                .edge_data
+                .halfedges
                 .last()
                 .ok_or(Error::HalfedgeNotFound)?
-                .halfedge
                 .ok_or(Error::HalfedgeNotFound)?,
         );
         // Setup halfedges.
@@ -231,7 +250,7 @@ impl Topology {
         }
         // Adjust vertices' halfedge handles.
         for i in 0..verts.len() {
-            if self.cache.edge_data[i].needs_adjust {
+            if self.cache.needs_adjust[i] {
                 self.adjust_outgoing_halfedge(verts[i]);
             }
         }

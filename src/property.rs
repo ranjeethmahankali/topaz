@@ -132,7 +132,7 @@ impl<T: TPropData> Property<T> {
             .try_borrow()
             .map_err(|_| Error::BorrowedPropertyAccess)?
             .get(i as usize)
-            .ok_or(Error::BorrowedPropertyAccess)
+            .ok_or(Error::OutOfBoundsAccess)
             .copied()
     }
 
