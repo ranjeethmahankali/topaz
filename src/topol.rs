@@ -85,10 +85,6 @@ impl Topology {
         &self.faces[f as usize]
     }
 
-    fn face_mut(&mut self, f: u32) -> &mut Face {
-        &mut self.faces[f as usize]
-    }
-
     pub fn to_vertex(&self, h: u32) -> u32 {
         self.halfedge(h).vertex
     }
@@ -156,12 +152,19 @@ impl Topology {
         Ok(fi)
     }
 
-    fn adjust_outgoing_halfedge(&mut self, _v: u32) {
-        todo!("Not Implemented");
+    pub fn set_face_halfedge(&mut self, f: u32, h: u32) {
+        self.faces[f as usize].halfedge = h;
     }
 
-    pub fn set_face_halfedge(&mut self, f: u32, h: u32) {
-        self.face_mut(f).halfedge = h;
+    pub fn set_vertex_halfedge(&mut self, v: u32, h: u32) {
+        self.vertices[v as usize].halfedge = Some(h);
+    }
+
+    fn adjust_outgoing_halfedge(&mut self, v: u32) {
+        match OutgoingHalfedgeIter::from(self, v).find(|h| self.is_boundary_halfedge(*h)) {
+            Some(h) => self.set_vertex_halfedge(v, h),
+            None => {} // Do nothing.
+        }
     }
 
     pub fn add_face(&mut self, verts: &[u32]) -> Result<u32, Error> {
