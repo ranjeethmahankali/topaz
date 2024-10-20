@@ -1,16 +1,16 @@
-use crate::mesh::Mesh;
+use crate::topol::Topology;
 
 pub struct OutgoingCCWHalfedgeIter<'a> {
-    mesh: &'a Mesh,
+    topol: &'a Topology,
     hstart: Option<u32>,
     hcurrent: Option<u32>,
 }
 
 impl<'a> OutgoingCCWHalfedgeIter<'a> {
-    pub fn from(mesh: &'a Mesh, v: u32) -> Self {
-        let h = mesh.vertex_halfedge(v);
+    pub fn from(topol: &'a Topology, v: u32) -> Self {
+        let h = topol.vertex_halfedge(v);
         OutgoingCCWHalfedgeIter {
-            mesh,
+            topol,
             hstart: h,
             hcurrent: h,
         }
@@ -24,8 +24,8 @@ impl<'a> Iterator for OutgoingCCWHalfedgeIter<'a> {
         match self.hcurrent {
             Some(current) => {
                 let next = self
-                    .mesh
-                    .opposite_halfedge(self.mesh.prev_halfedge(current));
+                    .topol
+                    .opposite_halfedge(self.topol.prev_halfedge(current));
                 self.hcurrent = match self.hstart {
                     Some(start) if start != next => Some(next),
                     _ => None,
@@ -40,16 +40,16 @@ impl<'a> Iterator for OutgoingCCWHalfedgeIter<'a> {
 pub type OutgoingHalfedgeIter<'a> = OutgoingCCWHalfedgeIter<'a>;
 
 pub struct OutgoingCWHalfedgeIter<'a> {
-    mesh: &'a Mesh,
+    topol: &'a Topology,
     hstart: Option<u32>,
     hcurrent: Option<u32>,
 }
 
 impl<'a> OutgoingCWHalfedgeIter<'a> {
-    pub fn from(mesh: &'a Mesh, v: u32) -> Self {
-        let h = mesh.vertex_halfedge(v);
+    pub fn from(topol: &'a Topology, v: u32) -> Self {
+        let h = topol.vertex_halfedge(v);
         OutgoingCWHalfedgeIter {
-            mesh,
+            topol,
             hstart: h,
             hcurrent: h,
         }
@@ -63,8 +63,8 @@ impl<'a> Iterator for OutgoingCWHalfedgeIter<'a> {
         match self.hcurrent {
             Some(current) => {
                 let next = self
-                    .mesh
-                    .next_halfedge(self.mesh.opposite_halfedge(current));
+                    .topol
+                    .next_halfedge(self.topol.opposite_halfedge(current));
                 self.hcurrent = match self.hstart {
                     Some(start) if start != next => Some(next),
                     _ => None,
