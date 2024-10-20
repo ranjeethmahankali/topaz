@@ -4,39 +4,52 @@ use crate::{
     property::{Property, PropertyContainer, TPropData},
 };
 
+enum TentativeEdge {
+    Old(u32),
+    New {
+        index: u32,
+        from: u32,
+        to: u32,
+        prev: Option<u32>,
+        next: Option<u32>,
+        opp_prev: Option<u32>,
+        opp_next: Option<u32>,
+    },
+}
+
 #[derive(Default)]
-struct Cache {
+pub(crate) struct TopolCache {
     halfedges: Vec<Option<u32>>,
     needs_adjust: Vec<bool>,
     next_cache: Vec<(u32, u32)>,
+    tentative: Vec<TentativeEdge>,
 }
 
-pub struct Vertex {
+pub(crate) struct Vertex {
     halfedge: Option<u32>,
 }
 
-pub struct Halfedge {
+pub(crate) struct Halfedge {
     face: Option<u32>,
     vertex: u32,
     next: u32,
     prev: u32,
 }
 
-pub struct Edge {
+pub(crate) struct Edge {
     halfedges: [Halfedge; 2],
 }
 
-pub struct Face {
+pub(crate) struct Face {
     halfedge: u32,
 }
 
-pub struct Topology {
+pub(crate) struct Topology {
     vertices: Vec<Vertex>,
     edges: Vec<Edge>,
     faces: Vec<Face>,
     vprops: PropertyContainer,
     fprops: PropertyContainer,
-    cache: Cache,
 }
 
 impl Topology {
@@ -47,7 +60,6 @@ impl Topology {
             faces: Vec::new(),
             vprops: PropertyContainer::new(),
             fprops: PropertyContainer::new(),
-            cache: Cache::default(),
         }
     }
 
@@ -58,7 +70,6 @@ impl Topology {
             faces: Vec::with_capacity(nfaces),
             vprops: PropertyContainer::new(),
             fprops: PropertyContainer::new(),
-            cache: Cache::default(),
         }
     }
 
@@ -71,15 +82,11 @@ impl Topology {
     }
 
     fn halfedge(&self, h: u32) -> &Halfedge {
-        &self.edge(h >> 1).halfedges[(h & 1) as usize]
+        &self.edges[(h >> 1) as usize].halfedges[(h & 1) as usize]
     }
 
-    fn edge(&self, e: u32) -> &Edge {
-        &self.edges[e as usize]
-    }
-
-    fn face(&self, f: u32) -> &Face {
-        &self.faces[f as usize]
+    fn halfedge_mut(&mut self, h: u32) -> &mut Halfedge {
+        &mut self.edges[(h >> 1) as usize].halfedges[(h & 1) as usize]
     }
 
     pub fn to_vertex(&self, h: u32) -> u32 {
@@ -103,7 +110,7 @@ impl Topology {
     }
 
     pub fn face_halfedge(&self, f: u32) -> u32 {
-        self.face(f).halfedge
+        self.faces[f as usize].halfedge
     }
 
     pub fn vertex_halfedge(&self, v: u32) -> Option<u32> {
@@ -143,18 +150,20 @@ impl Topology {
         Ok(vi)
     }
 
-    fn new_face(&mut self) -> Result<u32, Error> {
+    fn new_face(&mut self, halfedge: u32) -> Result<u32, Error> {
         let fi = self.faces.len() as u32;
         self.fprops.push_value()?;
+        self.faces.push(Face { halfedge });
         Ok(fi)
-    }
-
-    pub fn set_face_halfedge(&mut self, f: u32, h: u32) {
-        self.faces[f as usize].halfedge = h;
     }
 
     pub fn set_vertex_halfedge(&mut self, v: u32, h: u32) {
         self.vertices[v as usize].halfedge = Some(h);
+    }
+
+    pub fn set_next_halfedge(&mut self, hprev: u32, hnext: u32) {
+        self.halfedge_mut(hprev).next = hnext;
+        self.halfedge_mut(hnext).prev = hprev;
     }
 
     fn adjust_outgoing_halfedge(&mut self, v: u32) {
@@ -164,42 +173,67 @@ impl Topology {
         }
     }
 
-    pub fn add_face(&mut self, verts: &[u32]) -> Result<u32, Error> {
-        self.cache.halfedges.reserve(verts.len());
-        self.cache.needs_adjust.reserve(verts.len());
-        self.cache.next_cache.reserve(verts.len() * 6);
+    fn new_edge(
+        &mut self,
+        from: u32,
+        to: u32,
+        prev: u32,
+        next: u32,
+        opp_prev: u32,
+        opp_next: u32,
+    ) -> u32 {
+        let ei = self.edges.len() as u32;
+        self.edges.push(Edge {
+            halfedges: [
+                Halfedge {
+                    face: None,
+                    vertex: to,
+                    next,
+                    prev,
+                },
+                Halfedge {
+                    face: None,
+                    vertex: from,
+                    next: opp_next,
+                    prev: opp_prev,
+                },
+            ],
+        });
+        ei
+    }
+
+    pub fn add_face(&mut self, verts: &[u32], cache: &mut TopolCache) -> Result<u32, Error> {
+        cache.halfedges.reserve(verts.len());
+        cache.needs_adjust.reserve(verts.len());
+        cache.next_cache.reserve(verts.len() * 6);
         // Check for topological errors.
         for i in 0..verts.len() {
             if self.is_boundary_vertex(verts[i]) {
                 // Ensure vertex is manifold.
                 return Err(Error::ComplexVertex(verts[i]));
             }
-            let j = (i + 1) % verts.len();
             // Ensure edge is manifold.
-            let h = self.find_halfedge(verts[i], verts[j]);
+            let h = self.find_halfedge(verts[i], verts[(i + 1) % verts.len()]);
             match h {
                 Some(h) if !self.is_boundary_halfedge(h) => return Err(Error::ComplexEdge(h)),
                 _ => {} // Do nothing.
             }
-            self.cache.halfedges.push(h);
-            self.cache.needs_adjust.push(false);
+            cache.halfedges.push(h);
+            cache.needs_adjust.push(false);
         }
-        // Find consecutive halfedge pairs that need relinking, and relink the patches.
-        for i in 0..verts.len() {
-            let (prev, next) = {
-                let j = (i + 1) % verts.len();
-                match (self.cache.halfedges[i], self.cache.halfedges[j]) {
-                    (Some(prev), Some(next)) if self.next_halfedge(prev) != next => (prev, next),
-                    _ => continue,
-                }
-            };
-            // Relink the whole patch.
-            let outprev = self.opposite_halfedge(next);
+        // If any vertex has more than two incident boundary edges, relinking might be necessary.
+        for (prev, next) in (0..verts.len()).filter_map(|i| {
+            match (cache.halfedges[i], cache.halfedges[(i + 1) % verts.len()]) {
+                (Some(prev), Some(next)) if self.next_halfedge(prev) != next => Some((prev, next)),
+                _ => None,
+            }
+        }) {
+            // Relink the patch.
             let boundprev = {
-                let mut out = outprev;
+                let mut out = self.opposite_halfedge(next);
                 loop {
                     out = self.opposite_halfedge(self.next_halfedge(out));
-                    if !self.is_boundary_halfedge(out) {
+                    if self.is_boundary_halfedge(out) {
                         break;
                     }
                 }
@@ -217,40 +251,163 @@ impl Topology {
             let pstart = self.next_halfedge(prev);
             let pend = self.prev_halfedge(next);
             // relink.
-            self.cache.next_cache.extend_from_slice(&[
+            cache.next_cache.extend_from_slice(&[
                 (boundprev, pstart),
                 (pend, boundnext),
                 (prev, next),
             ]);
         }
-        // Create missing edges.
-        for i in 0..verts.len() {
-            if self.cache.halfedges[i].is_some() {
-                continue;
+        // Create boundary loop. No more errors allowed from this point.
+        // If anything goes wrong, we panic.
+        cache.tentative.clear();
+        cache.tentative.reserve(verts.len());
+        {
+            let mut ei = self.edges.len() as u32;
+            cache
+                .tentative
+                .extend((0..verts.len()).map(|i| match cache.halfedges[i] {
+                    Some(h) => TentativeEdge::Old(h),
+                    None => TentativeEdge::New {
+                        index: {
+                            let current = ei;
+                            ei += 1;
+                            current << 1
+                        },
+                        from: verts[i],
+                        to: verts[(i + 1) % verts.len()],
+                        prev: None,
+                        next: None,
+                        opp_prev: None,
+                        opp_next: None,
+                    },
+                }));
+        }
+        for (i, j) in (0..verts.len()).map(|i| (i, (i + 1) % verts.len())) {
+            let (e0, e1) = if j == 0 {
+                let (right, left) = cache.tentative.split_at_mut(i);
+                (&mut left[0], &mut right[0])
+            } else {
+                let (left, right) = cache.tentative.split_at_mut(j);
+                (&mut left[left.len() - 1], &mut right[0])
+            };
+            let v = verts[j];
+            match (e0, e1) {
+                (TentativeEdge::Old(_), TentativeEdge::Old(innernext)) => {
+                    cache.needs_adjust[j] = self.vertex_halfedge(v) == Some(*innernext);
+                }
+                (
+                    TentativeEdge::New {
+                        index: innerprev,
+                        opp_prev,
+                        next,
+                        ..
+                    },
+                    TentativeEdge::Old(innernext),
+                ) => {
+                    let innernext = *innernext;
+                    let innerprev = *innerprev;
+                    let outernext = self.opposite_halfedge(innerprev);
+                    let boundprev = self.prev_halfedge(innernext);
+                    cache.next_cache.push((boundprev, outernext));
+                    *opp_prev = Some(boundprev);
+                    cache.next_cache.push((innerprev, innernext));
+                    *next = Some(innernext);
+                    self.set_vertex_halfedge(v, outernext);
+                }
+                (
+                    TentativeEdge::Old(innerprev),
+                    TentativeEdge::New {
+                        index: innernext,
+                        prev,
+                        opp_next,
+                        ..
+                    },
+                ) => {
+                    let innerprev = *innerprev;
+                    let innernext = *innernext;
+                    let outerprev = self.opposite_halfedge(innernext);
+                    let boundnext = self.next_halfedge(innerprev);
+                    cache.next_cache.push((outerprev, boundnext));
+                    *opp_next = Some(boundnext);
+                    cache.next_cache.push((innerprev, innernext));
+                    *prev = Some(innerprev);
+                    self.set_vertex_halfedge(v, boundnext);
+                }
+                (
+                    TentativeEdge::New {
+                        index: innerprev,
+                        next,
+                        opp_prev,
+                        ..
+                    },
+                    TentativeEdge::New {
+                        index: innernext,
+                        prev,
+                        opp_next,
+                        ..
+                    },
+                ) => {
+                    let innerprev = *innerprev;
+                    let innernext = *innernext;
+                    let outernext = self.opposite_halfedge(innerprev);
+                    let outerprev = self.opposite_halfedge(innernext);
+                    if let Some(boundnext) = self.vertex_halfedge(v) {
+                        let boundprev = self.prev_halfedge(boundnext);
+                        cache
+                            .next_cache
+                            .extend(&[(boundprev, outernext), (outerprev, boundnext)]);
+                        *next = Some(innernext);
+                        *opp_prev = Some(boundprev);
+                        *prev = Some(innerprev);
+                        *opp_next = Some(boundnext);
+                    } else {
+                        self.set_vertex_halfedge(v, outernext);
+                        *next = Some(innernext);
+                        *opp_prev = Some(outerprev);
+                        *prev = Some(innerprev);
+                        *opp_next = Some(outernext);
+                    }
+                }
+            };
+        }
+        // Convert tentative edges into real edges.
+        const ERR: &str = "Unable to create edge loop";
+        for tedge in &cache.tentative {
+            match tedge {
+                TentativeEdge::Old(_) => continue,
+                TentativeEdge::New {
+                    index,
+                    from,
+                    to,
+                    prev,
+                    next,
+                    opp_prev,
+                    opp_next,
+                } => {
+                    let ei = self.new_edge(
+                        *from,
+                        *to,
+                        prev.expect(ERR),
+                        next.expect(ERR),
+                        opp_prev.expect(ERR),
+                        opp_next.expect(ERR),
+                    );
+                    assert!(*index == ei, "Failed to create an edge loop");
+                }
             }
-            todo!("Not Implemented");
         }
         // Create the face.
-        let fnew = self.new_face()?;
-        self.set_face_halfedge(
-            fnew,
-            self.cache
-                .halfedges
-                .last()
-                .ok_or(Error::HalfedgeNotFound)?
-                .ok_or(Error::HalfedgeNotFound)?,
-        );
-        // Setup halfedges.
-        for _i in 0..verts.len() {
-            todo!("Not Implemented");
-        }
+        let fnew = self.new_face(match cache.tentative.last().expect(ERR) {
+            TentativeEdge::Old(index) => *index,
+            TentativeEdge::New { index, .. } => *index,
+        })?;
         // Process next halfedge cache.
-        for _i in 0..verts.len() {
-            todo!("Not Implemented");
+        for (prev, next) in cache.next_cache.drain(..) {
+            self.set_next_halfedge(prev, next);
         }
         // Adjust vertices' halfedge handles.
         for i in 0..verts.len() {
-            if self.cache.needs_adjust[i] {
+            if cache.needs_adjust[i] {
                 self.adjust_outgoing_halfedge(verts[i]);
             }
         }
