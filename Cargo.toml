@@ -1,0 +1,14 @@
+[package]
+name = "alum"
+version = "0.1.0"
+edition = "2021"
+authors = ["Ranjeeth Mahankali <ranjeethmahankali@gmail.com>"]
+description = "Halfedge based polygon mesh library."
+readme = "README.md"
+repository = "https://github.com/ranjeethmahankali/alum"
+license = "GPL-3.0-only"
+keywords = ["mesh", "polygon", "halfedge", "geometry", "topology"]
+categories = ["mathematics", "graphics", "rendering"]
+
+[dependencies]
+glam = "0.8.5"
