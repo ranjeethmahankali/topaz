@@ -33,4 +33,8 @@ impl Mesh {
         self.points.set(vi, pos)?;
         Ok(vi)
     }
+
+    pub fn point(&self, vi: u32) -> Result<glam::Vec3, Error> {
+        self.points.get(vi)
+    }
 }
