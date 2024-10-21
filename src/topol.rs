@@ -470,6 +470,32 @@ impl Default for Topology {
 mod test {
     use super::{TopolCache, Topology};
 
+    fn quad_box() -> Topology {
+        let mut topol = Topology::with_capacity(8, 12, 6);
+        let verts: Vec<_> = (0..8)
+            .map(|_| topol.add_vertex().expect("Unable to add a vertex"))
+            .collect();
+        assert_eq!(verts, (0u32..8).collect::<Vec<_>>());
+        let mut cache = TopolCache::default();
+        let faces: Vec<_> = [
+            [0u32, 3, 2, 1],
+            [0, 1, 5, 4],
+            [1, 2, 6, 5],
+            [2, 3, 7, 6],
+            [3, 0, 4, 7],
+            [4, 5, 6, 7],
+        ]
+        .iter()
+        .map(|indices| {
+            topol
+                .add_face(indices, &mut cache)
+                .expect("Unable to add a face")
+        })
+        .collect();
+        assert_eq!(faces, (0..6).collect::<Vec<_>>());
+        topol
+    }
+
     #[test]
     fn t_triangle() {
         let mut topol = Topology::default();
@@ -510,5 +536,83 @@ mod test {
                 .count(),
             3
         );
+        for (i, j) in (0u32..3).map(|i| (i, (i + 1) % 3)) {
+            let h = topol.find_halfedge(i, j).unwrap();
+            assert!(!topol.is_boundary_halfedge(h));
+        }
+    }
+
+    #[test]
+    fn t_two_quads() {
+        let mut topol = Topology::default();
+        let mut cache = TopolCache::default();
+        let verts: Vec<_> = (0..4)
+            .map(|_| topol.add_vertex().expect("Cannot add vertex"))
+            .collect();
+        assert_eq!(verts.len(), 4);
+        let faces = [
+            topol
+                .add_face(&[verts[0], verts[1], verts[2]], &mut cache)
+                .expect("Cannot add face"),
+            topol
+                .add_face(&[verts[0], verts[2], verts[3]], &mut cache)
+                .expect("Cannot add face"),
+        ];
+        assert_eq!(faces, [0, 1]);
+        assert_eq!(topol.num_vertices(), 4);
+        assert_eq!(topol.num_halfedges(), 10);
+        assert_eq!(topol.num_edges(), 5);
+        assert_eq!(topol.num_faces(), 2);
+    }
+
+    #[test]
+    fn t_quad() {
+        let mut topol = Topology::default();
+        let mut cache = TopolCache::default();
+        let verts: Vec<_> = (0..4).map(|_| topol.add_vertex()).flatten().collect();
+        assert_eq!(verts, vec![0, 1, 2, 3]);
+        let face = topol.add_face(&verts, &mut cache).unwrap();
+        assert_eq!(topol.num_faces(), 1);
+        assert_eq!(topol.num_edges(), 4);
+        assert_eq!(topol.num_halfedges(), 8);
+        assert_eq!(topol.num_vertices(), 4);
+        assert_eq!(face, 0);
+        for v in topol.vertex_iter() {
+            let h = topol
+                .vertex_halfedge(v)
+                .expect("Vertex must have an incident halfedge");
+            assert!(topol.is_boundary_halfedge(h));
+            let oh = topol.opposite_halfedge(h);
+            assert!(!topol.is_boundary_halfedge(oh));
+            assert_eq!(
+                topol
+                    .halfedge_face(oh)
+                    .expect("Halfedge must have an incident face"),
+                face
+            );
+        }
+        assert_eq!(
+            topol
+                .halfedge_iter()
+                .filter(|h| topol.is_boundary_halfedge(*h))
+                .count(),
+            4
+        );
+        assert_eq!(
+            topol
+                .halfedge_iter()
+                .filter(|h| !topol.is_boundary_halfedge(*h))
+                .count(),
+            4
+        );
+    }
+
+    #[test]
+    fn t_box_manifold() {
+        let qbox = quad_box();
+        assert_eq!(qbox.num_vertices(), 8);
+        assert_eq!(qbox.num_halfedges(), 24);
+        assert_eq!(qbox.num_edges(), 12);
+        assert_eq!(qbox.num_faces(), 6);
     }
 }
