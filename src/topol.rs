@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use crate::{
     error::Error,
-    iterator::OutgoingHalfedgeIter,
+    iterator,
     property::{Property, PropertyContainer, TPropData},
 };
 
@@ -193,7 +193,7 @@ impl Topology {
     }
 
     pub fn find_halfedge(&self, from: u32, to: u32) -> Option<u32> {
-        OutgoingHalfedgeIter::from(self, from).find(|h| self.to_vertex(*h) == to)
+        iterator::voh_ccw_iter(self, from).find(|h| self.to_vertex(*h) == to)
     }
 
     pub fn add_vertex(&mut self) -> Result<u32, Error> {
@@ -220,7 +220,8 @@ impl Topology {
     }
 
     fn adjust_outgoing_halfedge(&mut self, v: u32) {
-        match OutgoingHalfedgeIter::from(self, v).find(|h| self.is_boundary_halfedge(*h)) {
+        let h = iterator::voh_ccw_iter(self, v).find(|h| self.is_boundary_halfedge(*h));
+        match h {
             Some(h) => self.set_vertex_halfedge(v, h),
             None => {} // Do nothing.
         }

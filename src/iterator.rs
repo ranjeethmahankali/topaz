@@ -6,17 +6,6 @@ pub struct OutgoingCCWHalfedgeIter<'a> {
     hcurrent: Option<u32>,
 }
 
-impl<'a> OutgoingCCWHalfedgeIter<'a> {
-    pub(crate) fn from(topol: &'a Topology, v: u32) -> Self {
-        let h = topol.vertex_halfedge(v);
-        OutgoingCCWHalfedgeIter {
-            topol,
-            hstart: h,
-            hcurrent: h,
-        }
-    }
-}
-
 impl<'a> Iterator for OutgoingCCWHalfedgeIter<'a> {
     type Item = u32;
 
@@ -45,17 +34,6 @@ pub struct OutgoingCWHalfedgeIter<'a> {
     hcurrent: Option<u32>,
 }
 
-impl<'a> OutgoingCWHalfedgeIter<'a> {
-    pub(crate) fn from(topol: &'a Topology, v: u32) -> Self {
-        let h = topol.vertex_halfedge(v);
-        OutgoingCWHalfedgeIter {
-            topol,
-            hstart: h,
-            hcurrent: h,
-        }
-    }
-}
-
 impl<'a> Iterator for OutgoingCWHalfedgeIter<'a> {
     type Item = u32;
 
@@ -76,20 +54,38 @@ impl<'a> Iterator for OutgoingCWHalfedgeIter<'a> {
     }
 }
 
+pub(crate) fn voh_ccw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+    let h = topol.vertex_halfedge(v);
+    OutgoingCCWHalfedgeIter {
+        topol,
+        hstart: h,
+        hcurrent: h,
+    }
+}
+
+pub(crate) fn voh_cw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+    let h = topol.vertex_halfedge(v);
+    OutgoingCWHalfedgeIter {
+        topol,
+        hstart: h,
+        hcurrent: h,
+    }
+}
+
 pub(crate) fn vf_ccw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
-    OutgoingCCWHalfedgeIter::from(topol, v).filter_map(|h| topol.halfedge_face(h))
+    voh_ccw_iter(topol, v).filter_map(|h| topol.halfedge_face(h))
 }
 
 pub(crate) fn vf_cw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
-    OutgoingCWHalfedgeIter::from(topol, v).filter_map(|h| topol.halfedge_face(h))
+    voh_cw_iter(topol, v).filter_map(|h| topol.halfedge_face(h))
 }
 
 pub(crate) fn vv_ccw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
-    OutgoingCCWHalfedgeIter::from(topol, v).map(|h| topol.to_vertex(h))
+    voh_ccw_iter(topol, v).map(|h| topol.to_vertex(h))
 }
 
 pub(crate) fn vv_cw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
-    OutgoingCWHalfedgeIter::from(topol, v).map(|h| topol.to_vertex(h))
+    voh_cw_iter(topol, v).map(|h| topol.to_vertex(h))
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use crate::{
     error::Error,
-    iterator::{self, OutgoingCCWHalfedgeIter, OutgoingCWHalfedgeIter},
+    iterator,
     property::Property,
     topol::{TopolCache, Topology},
 };
@@ -100,12 +100,12 @@ impl Mesh {
         self.topol.ccw_rotated_halfedge(h)
     }
 
-    pub fn voh_ccw_iter(&self, v: u32) -> OutgoingCCWHalfedgeIter {
-        OutgoingCCWHalfedgeIter::from(&self.topol, v)
+    pub fn voh_ccw_iter<'a>(&'a self, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::voh_ccw_iter(&self.topol, v)
     }
 
-    pub fn voh_cw_iter(&self, v: u32) -> OutgoingCWHalfedgeIter {
-        OutgoingCWHalfedgeIter::from(&self.topol, v)
+    pub fn voh_cw_iter<'a>(&'a self, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::voh_cw_iter(&self.topol, v)
     }
 
     pub fn vf_ccw_iter<'a>(&'a self, v: u32) -> impl Iterator<Item = u32> + use<'a> {
