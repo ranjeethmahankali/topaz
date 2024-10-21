@@ -28,6 +28,16 @@ pub(crate) struct TopolCache {
     halfedges: Vec<u32>,
 }
 
+impl TopolCache {
+    fn clear(&mut self) {
+        self.loop_halfedges.clear();
+        self.needs_adjust.clear();
+        self.next_cache.clear();
+        self.tentative.clear();
+        self.halfedges.clear();
+    }
+}
+
 pub(crate) struct Vertex {
     halfedge: Option<u32>,
 }
@@ -239,6 +249,7 @@ impl Topology {
     }
 
     pub fn add_face(&mut self, verts: &[u32], cache: &mut TopolCache) -> Result<u32, Error> {
+        cache.clear();
         cache.loop_halfedges.reserve(verts.len());
         cache.needs_adjust.reserve(verts.len());
         cache.next_cache.reserve(verts.len() * 6);
@@ -298,7 +309,6 @@ impl Topology {
         }
         // Create boundary loop. No more errors allowed from this point.
         // If anything goes wrong, we panic.
-        cache.tentative.clear();
         cache.tentative.reserve(verts.len());
         {
             let mut ei = self.edges.len() as u32;
@@ -410,7 +420,6 @@ impl Topology {
             };
         }
         // Convert tentative edges into real edges.
-        cache.halfedges.clear();
         cache.halfedges.reserve(cache.tentative.len());
         const ERR: &str = "Unable to create edge loop";
         for tedge in &cache.tentative {
