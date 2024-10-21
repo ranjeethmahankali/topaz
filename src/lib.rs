@@ -1,5 +1,6 @@
 pub mod error;
 pub mod mesh;
 pub mod property;
-pub mod iterator;
+
+mod iterator;
 mod topol;

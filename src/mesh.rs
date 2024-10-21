@@ -124,6 +124,22 @@ impl Mesh {
         iterator::vv_cw_iter(&self.topol, v)
     }
 
+    pub fn fh_ccw_iter<'a>(&'a self, f: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::fh_ccw_iter(&self.topol, f)
+    }
+
+    pub fn fh_cw_iter<'a>(&'a self, f: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::fh_cw_iter(&self.topol, f)
+    }
+
+    pub fn fv_ccw_iter<'a>(&'a self, f: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::fv_ccw_iter(&self.topol, f)
+    }
+
+    pub fn fv_cw_iter<'a>(&'a self, f: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::fv_cw_iter(&self.topol, f)
+    }
+
     pub fn add_vertex(&mut self, pos: glam::Vec3) -> Result<u32, Error> {
         let vi = self.topol.add_vertex()?;
         self.points.set(vi, pos)?;
