@@ -72,6 +72,10 @@ impl Mesh {
         self.topol.face_iter()
     }
 
+    pub fn is_boundary_edge(&self, e: u32) -> bool {
+        self.topol.is_boundary_edge(e)
+    }
+
     pub fn point(&self, vi: u32) -> Result<glam::Vec3, Error> {
         self.points.get(vi)
     }

@@ -42,6 +42,7 @@ pub(crate) struct Vertex {
     halfedge: Option<u32>,
 }
 
+#[derive(Debug)]
 pub(crate) struct Halfedge {
     face: Option<u32>,
     vertex: u32,
@@ -49,6 +50,7 @@ pub(crate) struct Halfedge {
     prev: u32,
 }
 
+#[derive(Debug)]
 pub(crate) struct Edge {
     halfedges: [Halfedge; 2],
 }
@@ -132,6 +134,11 @@ impl Topology {
 
     pub fn is_boundary_halfedge(&self, h: u32) -> bool {
         self.halfedge(h).face.is_none()
+    }
+
+    pub fn is_boundary_edge(&self, e: u32) -> bool {
+        let h = e << 1;
+        self.is_boundary_halfedge(h) || self.is_boundary_halfedge(self.opposite_halfedge(h))
     }
 
     pub fn is_boundary_vertex(&self, v: u32) -> bool {
@@ -423,8 +430,8 @@ impl Topology {
         cache.halfedges.reserve(cache.tentative.len());
         const ERR: &str = "Unable to create edge loop";
         for tedge in &cache.tentative {
-            match tedge {
-                TentativeEdge::Old(_) => continue,
+            let h = match tedge {
+                TentativeEdge::Old(h) => *h,
                 TentativeEdge::New {
                     index,
                     from,
@@ -443,9 +450,10 @@ impl Topology {
                         opp_next.expect(ERR),
                     );
                     assert_eq!(*index >> 1, ei, "Failed to create an edge loop");
-                    cache.halfedges.push(*index);
+                    *index
                 }
-            }
+            };
+            cache.halfedges.push(h);
         }
         // Create the face.
         let fnew = self.new_face(match cache.tentative.last().expect(ERR) {
@@ -552,7 +560,7 @@ mod test {
     }
 
     #[test]
-    fn t_two_quads() {
+    fn t_two_triangles() {
         let mut topol = Topology::default();
         let mut cache = TopolCache::default();
         let verts: Vec<_> = (0..4)
@@ -572,6 +580,20 @@ mod test {
         assert_eq!(topol.num_halfedges(), 10);
         assert_eq!(topol.num_edges(), 5);
         assert_eq!(topol.num_faces(), 2);
+        assert_eq!(
+            topol
+                .edge_iter()
+                .filter(|e| topol.is_boundary_edge(*e))
+                .count(),
+            4
+        );
+        assert_eq!(
+            topol
+                .edge_iter()
+                .filter(|e| !topol.is_boundary_edge(*e))
+                .count(),
+            1
+        );
     }
 
     #[test]
@@ -623,5 +645,9 @@ mod test {
         assert_eq!(qbox.num_halfedges(), 24);
         assert_eq!(qbox.num_edges(), 12);
         assert_eq!(qbox.num_faces(), 6);
+        assert!(
+            qbox.halfedge_iter().all(|h| !qbox.is_boundary_halfedge(h)),
+            "Not expecting any boundary edges"
+        );
     }
 }
