@@ -2,9 +2,7 @@ use std::ops::Range;
 
 use crate::{
     error::Error,
-    iterator::{
-        OutgoingCCWHalfedgeIter, OutgoingCWHalfedgeIter, VertexCCWFaceIter, VertexCWFaceIter,
-    },
+    iterator::{self, OutgoingCCWHalfedgeIter, OutgoingCWHalfedgeIter},
     property::Property,
     topol::{TopolCache, Topology},
 };
@@ -110,12 +108,20 @@ impl Mesh {
         OutgoingCWHalfedgeIter::from(&self.topol, v)
     }
 
-    pub fn vf_ccw_iter(&self, v: u32) -> VertexCCWFaceIter {
-        VertexCCWFaceIter::from(&self.topol, v)
+    pub fn vf_ccw_iter<'a>(&'a self, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::vf_ccw_iter(&self.topol, v)
     }
 
-    pub fn vf_cw_iter(&self, v: u32) -> VertexCWFaceIter {
-        VertexCWFaceIter::from(&self.topol, v)
+    pub fn vf_cw_iter<'a>(&'a self, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::vf_cw_iter(&self.topol, v)
+    }
+
+    pub fn vv_ccw_iter<'a>(&'a self, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::vv_ccw_iter(&self.topol, v)
+    }
+
+    pub fn vv_cw_iter<'a>(&'a self, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+        iterator::vv_cw_iter(&self.topol, v)
     }
 
     pub fn add_vertex(&mut self, pos: glam::Vec3) -> Result<u32, Error> {

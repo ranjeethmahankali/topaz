@@ -76,50 +76,26 @@ impl<'a> Iterator for OutgoingCWHalfedgeIter<'a> {
     }
 }
 
-pub struct VertexCCWFaceIter<'a> {
-    outgoing: OutgoingCCWHalfedgeIter<'a>,
+pub(crate) fn vf_ccw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+    OutgoingCCWHalfedgeIter::from(topol, v).filter_map(|h| topol.halfedge_face(h))
 }
 
-impl<'a> VertexCCWFaceIter<'a> {
-    pub(crate) fn from(topol: &'a Topology, v: u32) -> Self {
-        VertexCCWFaceIter {
-            outgoing: OutgoingCCWHalfedgeIter::from(topol, v),
-        }
-    }
+pub(crate) fn vf_cw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+    OutgoingCWHalfedgeIter::from(topol, v).filter_map(|h| topol.halfedge_face(h))
 }
 
-impl<'a> Iterator for VertexCCWFaceIter<'a> {
-    type Item = u32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.outgoing.topol.halfedge_face(self.outgoing.next()?)
-    }
+pub(crate) fn vv_ccw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+    OutgoingCCWHalfedgeIter::from(topol, v).map(|h| topol.to_vertex(h))
 }
 
-pub struct VertexCWFaceIter<'a> {
-    outgoing: OutgoingCWHalfedgeIter<'a>,
-}
-
-impl<'a> VertexCWFaceIter<'a> {
-    pub(crate) fn from(topol: &'a Topology, v: u32) -> Self {
-        VertexCWFaceIter {
-            outgoing: OutgoingCWHalfedgeIter::from(topol, v),
-        }
-    }
-}
-
-impl<'a> Iterator for VertexCWFaceIter<'a> {
-    type Item = u32;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.outgoing.topol.halfedge_face(self.outgoing.next()?)
-    }
+pub(crate) fn vv_cw_iter<'a>(topol: &'a Topology, v: u32) -> impl Iterator<Item = u32> + use<'a> {
+    OutgoingCWHalfedgeIter::from(topol, v).map(|h| topol.to_vertex(h))
 }
 
 #[cfg(test)]
 mod test {
     use crate::{
-        iterator::{VertexCCWFaceIter, VertexCWFaceIter},
+        iterator::{vf_ccw_iter, vf_cw_iter, vv_ccw_iter, vv_cw_iter},
         topol::{TopolCache, Topology},
     };
 
@@ -154,76 +130,54 @@ mod test {
     }
 
     #[test]
-    fn t_box_vertex_ccw_faces() {
+    fn t_box_vf_ccw_iter() {
         let qbox = quad_box();
-        assert_eq!(
-            VertexCCWFaceIter::from(&qbox, 0).collect::<Vec<_>>(),
-            vec![4, 0, 1]
-        );
-        assert_eq!(
-            VertexCCWFaceIter::from(&qbox, 1).collect::<Vec<_>>(),
-            vec![2, 1, 0]
-        );
-        assert_eq!(
-            VertexCCWFaceIter::from(&qbox, 2).collect::<Vec<_>>(),
-            vec![3, 2, 0]
-        );
-        assert_eq!(
-            VertexCCWFaceIter::from(&qbox, 3).collect::<Vec<_>>(),
-            vec![4, 3, 0]
-        );
-        assert_eq!(
-            VertexCCWFaceIter::from(&qbox, 4).collect::<Vec<_>>(),
-            vec![5, 4, 1]
-        );
-        assert_eq!(
-            VertexCCWFaceIter::from(&qbox, 5).collect::<Vec<_>>(),
-            vec![5, 1, 2]
-        );
-        assert_eq!(
-            VertexCCWFaceIter::from(&qbox, 6).collect::<Vec<_>>(),
-            vec![5, 2, 3]
-        );
-        assert_eq!(
-            VertexCCWFaceIter::from(&qbox, 7).collect::<Vec<_>>(),
-            vec![5, 3, 4]
-        );
+        assert_eq!(&vf_ccw_iter(&qbox, 0).collect::<Vec<_>>(), &[4, 0, 1]);
+        assert_eq!(&vf_ccw_iter(&qbox, 1).collect::<Vec<_>>(), &[2, 1, 0]);
+        assert_eq!(&vf_ccw_iter(&qbox, 2).collect::<Vec<_>>(), &[3, 2, 0]);
+        assert_eq!(&vf_ccw_iter(&qbox, 3).collect::<Vec<_>>(), &[4, 3, 0]);
+        assert_eq!(&vf_ccw_iter(&qbox, 4).collect::<Vec<_>>(), &[5, 4, 1]);
+        assert_eq!(&vf_ccw_iter(&qbox, 5).collect::<Vec<_>>(), &[5, 1, 2]);
+        assert_eq!(&vf_ccw_iter(&qbox, 6).collect::<Vec<_>>(), &[5, 2, 3]);
+        assert_eq!(&vf_ccw_iter(&qbox, 7).collect::<Vec<_>>(), &[5, 3, 4]);
     }
 
     #[test]
-    fn t_box_vertex_cw_faces() {
+    fn t_box_vf_cw_iter() {
         let qbox = quad_box();
-        assert_eq!(
-            VertexCWFaceIter::from(&qbox, 0).collect::<Vec<_>>(),
-            vec![4, 1, 0]
-        );
-        assert_eq!(
-            VertexCWFaceIter::from(&qbox, 1).collect::<Vec<_>>(),
-            vec![2, 0, 1]
-        );
-        assert_eq!(
-            VertexCWFaceIter::from(&qbox, 2).collect::<Vec<_>>(),
-            vec![3, 0, 2]
-        );
-        assert_eq!(
-            VertexCWFaceIter::from(&qbox, 3).collect::<Vec<_>>(),
-            vec![4, 0, 3]
-        );
-        assert_eq!(
-            VertexCWFaceIter::from(&qbox, 4).collect::<Vec<_>>(),
-            vec![5, 1, 4]
-        );
-        assert_eq!(
-            VertexCWFaceIter::from(&qbox, 5).collect::<Vec<_>>(),
-            vec![5, 2, 1]
-        );
-        assert_eq!(
-            VertexCWFaceIter::from(&qbox, 6).collect::<Vec<_>>(),
-            vec![5, 3, 2]
-        );
-        assert_eq!(
-            VertexCWFaceIter::from(&qbox, 7).collect::<Vec<_>>(),
-            vec![5, 4, 3]
-        );
+        assert_eq!(&vf_cw_iter(&qbox, 0).collect::<Vec<_>>(), &[4, 1, 0]);
+        assert_eq!(&vf_cw_iter(&qbox, 1).collect::<Vec<_>>(), &[2, 0, 1]);
+        assert_eq!(&vf_cw_iter(&qbox, 2).collect::<Vec<_>>(), &[3, 0, 2]);
+        assert_eq!(&vf_cw_iter(&qbox, 3).collect::<Vec<_>>(), &[4, 0, 3]);
+        assert_eq!(&vf_cw_iter(&qbox, 4).collect::<Vec<_>>(), &[5, 1, 4]);
+        assert_eq!(&vf_cw_iter(&qbox, 5).collect::<Vec<_>>(), &[5, 2, 1]);
+        assert_eq!(&vf_cw_iter(&qbox, 6).collect::<Vec<_>>(), &[5, 3, 2]);
+        assert_eq!(&vf_cw_iter(&qbox, 7).collect::<Vec<_>>(), &[5, 4, 3]);
+    }
+
+    #[test]
+    fn t_box_vv_ccw_iter() {
+        let qbox = quad_box();
+        assert_eq!(&vv_ccw_iter(&qbox, 0).collect::<Vec<_>>(), &[4, 3, 1]);
+        assert_eq!(&vv_ccw_iter(&qbox, 1).collect::<Vec<_>>(), &[2, 5, 0]);
+        assert_eq!(&vv_ccw_iter(&qbox, 2).collect::<Vec<_>>(), &[3, 6, 1]);
+        assert_eq!(&vv_ccw_iter(&qbox, 3).collect::<Vec<_>>(), &[0, 7, 2]);
+        assert_eq!(&vv_ccw_iter(&qbox, 4).collect::<Vec<_>>(), &[5, 7, 0]);
+        assert_eq!(&vv_ccw_iter(&qbox, 5).collect::<Vec<_>>(), &[6, 4, 1]);
+        assert_eq!(&vv_ccw_iter(&qbox, 6).collect::<Vec<_>>(), &[7, 5, 2]);
+        assert_eq!(&vv_ccw_iter(&qbox, 7).collect::<Vec<_>>(), &[4, 6, 3]);
+    }
+
+    #[test]
+    fn t_box_vv_cw_iter() {
+        let qbox = quad_box();
+        assert_eq!(&vv_cw_iter(&qbox, 0).collect::<Vec<_>>(), &[4, 1, 3]);
+        assert_eq!(&vv_cw_iter(&qbox, 1).collect::<Vec<_>>(), &[2, 0, 5]);
+        assert_eq!(&vv_cw_iter(&qbox, 2).collect::<Vec<_>>(), &[3, 1, 6]);
+        assert_eq!(&vv_cw_iter(&qbox, 3).collect::<Vec<_>>(), &[0, 2, 7]);
+        assert_eq!(&vv_cw_iter(&qbox, 4).collect::<Vec<_>>(), &[5, 0, 7]);
+        assert_eq!(&vv_cw_iter(&qbox, 5).collect::<Vec<_>>(), &[6, 1, 4]);
+        assert_eq!(&vv_cw_iter(&qbox, 6).collect::<Vec<_>>(), &[7, 2, 5]);
+        assert_eq!(&vv_cw_iter(&qbox, 7).collect::<Vec<_>>(), &[4, 3, 6]);
     }
 }
