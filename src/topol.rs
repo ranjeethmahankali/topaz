@@ -510,6 +510,10 @@ mod test {
         })
         .collect();
         assert_eq!(faces, (0..6).collect::<Vec<_>>());
+        assert_eq!(topol.num_vertices(), 8);
+        assert_eq!(topol.num_halfedges(), 24);
+        assert_eq!(topol.num_edges(), 12);
+        assert_eq!(topol.num_faces(), 6);
         topol
     }
 
@@ -641,10 +645,6 @@ mod test {
     #[test]
     fn t_box_manifold() {
         let qbox = quad_box();
-        assert_eq!(qbox.num_vertices(), 8);
-        assert_eq!(qbox.num_halfedges(), 24);
-        assert_eq!(qbox.num_edges(), 12);
-        assert_eq!(qbox.num_faces(), 6);
         assert!(
             qbox.halfedge_iter().all(|h| !qbox.is_boundary_halfedge(h)),
             "Not expecting any boundary edges"

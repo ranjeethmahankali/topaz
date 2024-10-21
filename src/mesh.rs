@@ -2,7 +2,9 @@ use std::ops::Range;
 
 use crate::{
     error::Error,
-    iterator::OutgoingCWHalfedgeIter,
+    iterator::{
+        OutgoingCCWHalfedgeIter, OutgoingCWHalfedgeIter, VertexCCWFaceIter, VertexCWFaceIter,
+    },
     property::Property,
     topol::{TopolCache, Topology},
 };
@@ -100,8 +102,20 @@ impl Mesh {
         self.topol.ccw_rotated_halfedge(h)
     }
 
+    pub fn voh_ccw_iter(&self, v: u32) -> OutgoingCCWHalfedgeIter {
+        OutgoingCCWHalfedgeIter::from(&self.topol, v)
+    }
+
     pub fn voh_cw_iter(&self, v: u32) -> OutgoingCWHalfedgeIter {
         OutgoingCWHalfedgeIter::from(&self.topol, v)
+    }
+
+    pub fn vf_ccw_iter(&self, v: u32) -> VertexCCWFaceIter {
+        VertexCCWFaceIter::from(&self.topol, v)
+    }
+
+    pub fn vf_cw_iter(&self, v: u32) -> VertexCWFaceIter {
+        VertexCWFaceIter::from(&self.topol, v)
     }
 
     pub fn add_vertex(&mut self, pos: glam::Vec3) -> Result<u32, Error> {
